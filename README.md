@@ -16,8 +16,8 @@ sbt run
 curl http://localhost:8080/weather/lat/39.7456/lon/-97.0892
 
 ##
-This is just a simple one route service that quries the National Weather Service API(https://www.weather.gov/documentation/services-web-api)
-and returns Todays short forecast(eg Cloudy, Sunny etc) and a characterization of the temperature(hot, cold or moderate)
+This is just a simple one route service that queries the National Weather Service API(https://www.weather.gov/documentation/services-web-api)
+and returns the weather for the day short forecast(eg Cloudy, Sunny etc) and a characterization of the temperature(hot, cold or moderate)
 
 Its just a howto and not what one would consider production code as its missing the following
 - Tests

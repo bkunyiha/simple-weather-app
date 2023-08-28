@@ -45,7 +45,6 @@ object Forecast {
         uri =>
           C.expect[PointForecast](GET(uri))
             .adaptError { case t =>
-              t.printStackTrace()
               ForecastError(t)
             } // Prevent Client Json Decoding Failure Leaking
       )
@@ -54,13 +53,11 @@ object Forecast {
     def gridPoint(url: String): F[GripPointForecast] = {
       Uri.fromString(url).fold(
         e => {
-          e.printStackTrace()
           UrlError(e).raiseError[F, GripPointForecast]
         },
         uri =>
           C.expect[GripPointForecast](GET(uri))
             .adaptError { case t =>
-              t.printStackTrace()
               ForecastError(t)
             } // Prevent Client Json Decoding Failure Leaking
       )
