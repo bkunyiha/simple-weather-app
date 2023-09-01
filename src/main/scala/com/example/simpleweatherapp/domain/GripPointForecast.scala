@@ -3,8 +3,8 @@ package com.example.simpleweatherapp.domain
 import cats.effect.Concurrent
 import io.circe.generic.semiauto._
 import io.circe.{Decoder, Encoder}
-import org.http4s.{EntityDecoder, _}
 import org.http4s.circe._
+import org.http4s.{EntityDecoder, _}
 
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter

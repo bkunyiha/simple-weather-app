@@ -20,9 +20,7 @@ This is just a simple one route service that queries the National Weather Servic
 and returns the weather for the day short forecast(eg Cloudy, Sunny etc) and a characterization of the temperature(hot, cold or moderate)
 
 Its just a howto and not what one would consider production code as its missing the following
-- Tests
-- Error handling at the route level to return ineligible responses to clients
-- Logging
+- Needs more tests
 - Config Service
 - Build process
 - API documentation eg using Swagger

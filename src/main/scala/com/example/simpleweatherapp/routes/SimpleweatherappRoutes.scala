@@ -2,10 +2,12 @@ package com.example.simpleweatherapp.routes
 
 import cats.effect.Sync
 import cats.implicits._
+import com.example.simpleweatherapp.domain.ForecastNotFoundError
 import com.example.simpleweatherapp.services.WeatherResponse._
 import com.example.simpleweatherapp.services.Forecast
-import org.http4s.HttpRoutes
+import org.http4s.{DecodeFailure, HttpRoutes, Response}
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.util.Try
 
@@ -31,15 +33,25 @@ object SimpleweatherappRoutes {
     }
   }
 
-  def forecastRoutes[F[_] : Sync](J: Forecast[F]): HttpRoutes[F] = {
+  def forecastRoutes[F[_] : Sync](J: Forecast[F])(implicit logger: Logger[F]): HttpRoutes[F] = {
     val dsl = new Http4sDsl[F] {}
     import dsl._
+
+    def httpErrorResponse(implicit logger: Logger[F]): Throwable => F[Response[F]] = {
+      case ForecastNotFoundError(e) => NotFound(e.getMessage)
+      case _: IllegalArgumentException => BadRequest("Invalid Longitute or Latitude")
+      case _: DecodeFailure => BadRequest("Invalid Payload")
+      case error =>
+        logger.error(s"Internal Server Error WHen Executing Route Request $error") *>
+          InternalServerError("")
+    }
+
     HttpRoutes.of[F] {
       case GET -> Root / "weather" / "lat" / LatitudeVar(lat) / "lon" / LongitudeVar(lon) =>
-        for {
+        (for {
           forecast <- J.weather(lat, lon)
           resp <- Ok(forecast)
-        } yield resp
+        } yield resp).handleErrorWith(httpErrorResponse)
     }
   }
 }
