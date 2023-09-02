@@ -39,7 +39,7 @@ object SimpleweatherappRoutes {
 
     def httpErrorResponse(implicit logger: Logger[F]): Throwable => F[Response[F]] = {
       case ForecastNotFoundError(e) => NotFound(e.getMessage)
-      case _: IllegalArgumentException => BadRequest("Invalid Longitute or Latitude")
+      case _: IllegalArgumentException => BadRequest("Invalid Longitude or Latitude")
       case _: DecodeFailure => BadRequest("Invalid Payload")
       case error =>
         logger.error(s"Internal Server Error WHen Executing Route Request $error") *>

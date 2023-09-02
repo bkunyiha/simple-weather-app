@@ -1,156 +1,70 @@
 package com.example.simpleweatherapp.services
 
 import cats.effect.IO
-import com.example.simpleweatherapp.domain.{PointForecast, PointForecastsProperties}
-import org.scalamock.scalatest.MockFactory
+import cats.implicits.catsSyntaxApplicativeErrorId
+import com.example.simpleweatherapp.domain.{ForecastNotFoundError, GripPointForecast, PointForecast}
 import com.example.simpleweatherapp.routes.SimpleweatherappRoutes.{Latitude, Longitude}
-import munit.CatsEffectAssertions.assertIO
-import org.scalatest.funsuite.AnyFunSuite
+import io.circe.Json
+import munit.CatsEffectSuite
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-class ForecastTest extends AnyFunSuite with MockFactory {
+class ForecastTest extends CatsEffectSuite {
 
   import cats.effect.unsafe.IORuntime
-  import com.example.simpleweatherapp.services.ForecastTest.pointForecastJsonS
+  import ForecastTest._
 
   implicit val runtime: IORuntime = cats.effect.unsafe.IORuntime.global
   implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
-  val forecastClientMock = mock[ForecastClient[IO]]
-  val forecastService = Forecast.impl[IO](forecastClientMock)
+  def fakeForecastClient = new ForecastClient[IO] {
+    override def httpRequest(url: String): IO[Json] = {
+      if(url.contains("https://api.weather.gov/points"))
+        IO.pure(expectedPointForecastJson)
+      else if(url.contains(expectedPointForecast.properties.forecast))
+        IO.pure(expectedGridPointForecastJson)
+      else
+        ForecastNotFoundError(new RuntimeException("Invalid URL")).raiseError[IO, Json]
+    }
+  }
+  val forecastService = Forecast.impl[IO](fakeForecastClient)
   val lat = Latitude(39.7456)
   val lon = Longitude(-97.0892)
 
+  test("forecast Should Return the PointForecast object") {
+    val pointForecastRes: IO[PointForecast] = forecastService.forecast(lat, lon)
+    assertIO(pointForecastRes, expectedPointForecast)
+  }
 
-  test("find ShoppingCart By Id Should Return Shopping Cart") {
-    val url = s"https://api.weather.gov/points/${lat.value},${lon.value}"
+  test("gridPoint Should Return the GripPointForecast object") {
+    val gridPointForecastRes: IO[GripPointForecast] = forecastService.gridPoint(expectedPointForecast.properties.forecast)
+    assertIO(gridPointForecastRes, expectedGridPointForecast)
+  }
 
-    val pointForecastsProperties = PointForecastsProperties(geometry = None,
-      `@id` = "https://api.weather.gov/points/39.7456,-97.0892",
-      `@type` = "wx:Point",
-      cwa = "TOP",
-      forecastOffice = "https://api.weather.gov/offices/TOP",
-      gridId = "TOP",
-      gridX = 32,
-      gridY = 81,
-      forecast = "https://api.weather.gov/gridpoints/TOP/32,81/forecast",
-      forecastHourly = "https://api.weather.gov/gridpoints/TOP/32,81/forecast/hourly",
-      forecastGridData = "https://api.weather.gov/gridpoints/TOP/32,81",
-      observationStations = "https://api.weather.gov/gridpoints/TOP/32,81/stations",
-      forecastZone = "https://api.weather.gov/zones/forecast/KSZ009",
-      county = "https://api.weather.gov/zones/county/KSC201",
-      fireWeatherZone = "https://api.weather.gov/zones/fire/KSZ009",
-      timeZone = "America/Chicago",
-      radarStation = "KTWX"
+  test("weather Should Return the WeatherResponse object") {
+    val gridPointPeriod = expectedGridPointForecast.properties.periods.find(_.number == 1).get
+    val weatherResponse =  WeatherResponse(
+      shortForecast = gridPointPeriod.shortForecast,
+      temperature = ForecastOps.temperature(gridPointPeriod.temperature)
     )
-    val pointForecastRes = PointForecast(pointForecastsProperties.`@id`, "Feature", properties = pointForecastsProperties)
-    (forecastClientMock.httpRequest _).expects(url).returning(IO.pure(pointForecastJsonS)).once(): Unit
-
-    val pointForecast: IO[PointForecast] = forecastService.forecast(lat, lon)
-    assertIO(pointForecast, pointForecastRes)
+    val weatherResponseRes: IO[WeatherResponse] = forecastService.weather(lat, lon)
+    assertIO(weatherResponseRes, weatherResponse)
   }
 }
 
 object ForecastTest {
 
+  import scala.io.Source
   import io.circe.parser._
 
-  val pointForecastJsonString =
-    """{
-      |    "@context": [
-      |        "https://geojson.org/geojson-ld/geojson-context.jsonld",
-      |        {
-      |            "@version": "1.1",
-      |            "wx": "https://api.weather.gov/ontology#",
-      |            "s": "https://schema.org/",
-      |            "geo": "http://www.opengis.net/ont/geosparql#",
-      |            "unit": "http://codes.wmo.int/common/unit/",
-      |            "@vocab": "https://api.weather.gov/ontology#",
-      |            "geometry": {
-      |                "@id": "s:GeoCoordinates",
-      |                "@type": "geo:wktLiteral"
-      |            },
-      |            "city": "s:addressLocality",
-      |            "state": "s:addressRegion",
-      |            "distance": {
-      |                "@id": "s:Distance",
-      |                "@type": "s:QuantitativeValue"
-      |            },
-      |            "bearing": {
-      |                "@type": "s:QuantitativeValue"
-      |            },
-      |            "value": {
-      |                "@id": "s:value"
-      |            },
-      |            "unitCode": {
-      |                "@id": "s:unitCode",
-      |                "@type": "@id"
-      |            },
-      |            "forecastOffice": {
-      |                "@type": "@id"
-      |            },
-      |            "forecastGridData": {
-      |                "@type": "@id"
-      |            },
-      |            "publicZone": {
-      |                "@type": "@id"
-      |            },
-      |            "county": {
-      |                "@type": "@id"
-      |            }
-      |        }
-      |    ],
-      |    "id": "https://api.weather.gov/points/39.7456,-97.0892",
-      |    "type": "Feature",
-      |    "geometry": {
-      |        "type": "Point",
-      |        "coordinates": [
-      |            -97.089200000000005,
-      |            39.745600000000003
-      |        ]
-      |    },
-      |    "properties": {
-      |        "@id": "https://api.weather.gov/points/39.7456,-97.0892",
-      |        "@type": "wx:Point",
-      |        "cwa": "TOP",
-      |        "forecastOffice": "https://api.weather.gov/offices/TOP",
-      |        "gridId": "TOP",
-      |        "gridX": 32,
-      |        "gridY": 81,
-      |        "forecast": "https://api.weather.gov/gridpoints/TOP/32,81/forecast",
-      |        "forecastHourly": "https://api.weather.gov/gridpoints/TOP/32,81/forecast/hourly",
-      |        "forecastGridData": "https://api.weather.gov/gridpoints/TOP/32,81",
-      |        "observationStations": "https://api.weather.gov/gridpoints/TOP/32,81/stations",
-      |        "relativeLocation": {
-      |            "type": "Feature",
-      |            "geometry": {
-      |                "type": "Point",
-      |                "coordinates": [
-      |                    -97.086661000000007,
-      |                    39.679375999999998
-      |                ]
-      |            },
-      |            "properties": {
-      |                "city": "Linn",
-      |                "state": "KS",
-      |                "distance": {
-      |                    "unitCode": "wmoUnit:m",
-      |                    "value": 7366.9851976443997
-      |                },
-      |                "bearing": {
-      |                    "unitCode": "wmoUnit:degree_(angle)",
-      |                    "value": 358
-      |                }
-      |            }
-      |        },
-      |        "forecastZone": "https://api.weather.gov/zones/forecast/KSZ009",
-      |        "county": "https://api.weather.gov/zones/county/KSC201",
-      |        "fireWeatherZone": "https://api.weather.gov/zones/fire/KSZ009",
-      |        "timeZone": "America/Chicago",
-      |        "radarStation": "KTWX"
-      |    }
-      |}""".stripMargin.trim
+  val pointsJsonResource = Source.fromResource("points.json")
+  val pointsJsonString = pointsJsonResource.getLines().mkString
+  val expectedPointForecastJson: Json = parse(pointsJsonString).toOption.get
+  val expectedPointForecast = expectedPointForecastJson.as[PointForecast].toOption.get
 
-  val pointForecastJsonS = parse(pointForecastJsonString).toOption.get
+  val gridPointsJsonResource = Source.fromResource("gridpoints.json")
+  val gridPointJsonString = gridPointsJsonResource.getLines().mkString
+  val expectedGridPointForecastJson: Json = parse(gridPointJsonString).toOption.get
+  val expectedGridPointForecast = expectedGridPointForecastJson.as[GripPointForecast].toOption.get
+
 }

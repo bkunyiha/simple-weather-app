@@ -5,6 +5,7 @@ import cats.implicits._
 import com.example.simpleweatherapp.domain.GripPointForecast._
 import com.example.simpleweatherapp.domain._
 import com.example.simpleweatherapp.routes.SimpleweatherappRoutes.{Latitude, Longitude}
+import com.example.simpleweatherapp.services.ForecastOps._
 import org.typelevel.log4cats.Logger
 
 trait Forecast[F[_]] {
@@ -49,21 +50,6 @@ object Forecast {
           logger.error(s"Decoding error decoding GripPointForecast ${error.getMessage()}"): Unit
           ForecastDecodingError(error).raiseError[F, GripPointForecast]
       }
-    }
-
-    object cold {
-      def unapply(temp: Int): Boolean = temp <= 62
-    }
-
-    object moderate {
-      def unapply(temp: Int): Boolean = temp <= 78
-    }
-
-    def temperature(temp: Int): String = temp match {
-      case cold() => "cold"
-      case moderate() => "moderate"
-      case _ => "hot"
-
     }
   }
 }
